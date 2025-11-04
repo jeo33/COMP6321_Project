@@ -73,13 +73,13 @@ def main():
     print("="*70)
 
     model = DNNClassifier(
-        #hidden_layers=[512, 256, 128],   # 3 hidden layers 8192,2048,512
-        hidden_layers=[32768,8192,2048,512, 256, 128],  # 6 hidden layers
+        hidden_layers=[512, 256, 128],   # 3 hidden layers 8192,2048,512
+        #hidden_layers=[32768,8192,2048,512, 256, 128],  # 6 hidden layers
         activation='relu',                # ReLU activation
         dropout=0.3,                      # 30% dropout
         learning_rate=0.001,              
         batch_size=512,                   
-        epochs=50,                        
+        epochs=20,                        
         device='auto',                    
         random_state=42
     )
