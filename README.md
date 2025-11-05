@@ -2,7 +2,7 @@
 
 -  Multi-label classification (103 categories, ~804K documents)
 -  GPU-accelerated 3-layer DNN with Batch Normalization
--  7 baseline model comparisons (Logistic, SVM, Random Forest, etc.)
+-  5 baseline model comparisons (Logistic, SVM, Random Forest, etc.)
 -  8+ evaluation metrics with rich visualizations
 -  **5.5%+ F1-score improvement** over traditional methods
 
