@@ -14,3 +14,6 @@ results/
 
 # Local BERT model
 bert_model/
+
+# Personal test sbatch files
+ccdb_bingxu_test*.sbatch
