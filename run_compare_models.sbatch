@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-node=1
-#SBATCH --partition=debug
+#SBATCH --partition=compute
 
 # Set resource limits to avoid OpenBLAS threading issues
 ulimit -u 16384  # Increase max user processes
@@ -89,8 +89,14 @@ python -c "import sklearn; print('Scikit-learn version:', sklearn.__version__)" 
 echo ""
 
 # Run the Python script
-echo "Running compare_models.py..."
+echo "Running main.py to train DNN..."
 python main.py
+if [ $? -ne 0 ]; then
+    echo "main.py failed! Exiting."
+    exit 1
+fi
+
+echo "Running compare_models.py..."
 python compare_models.py
 
 echo ""

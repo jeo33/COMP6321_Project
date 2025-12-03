@@ -198,8 +198,13 @@ class RCV1DataLoader:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {device}")
         
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        model = BertModel.from_pretrained('bert-base-uncased').to(device)
+        # Check for local model
+        local_model_path = '/scratch/gjp1993/COMP6321_Project/bert_model'
+        model_name_or_path = local_model_path if os.path.exists(local_model_path) else 'bert-base-uncased'
+        print(f"Loading BERT model from: {model_name_or_path}")
+        
+        tokenizer = BertTokenizer.from_pretrained(model_name_or_path)
+        model = BertModel.from_pretrained(model_name_or_path).to(device)
         model.eval()
         
         embeddings = []

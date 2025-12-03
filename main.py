@@ -54,7 +54,7 @@ def main():
             data_loader.download_raw_and_embed(
                 test_size=0.2,
                 val_size=0.1,
-                max_samples=5000  # Adjust this based on your GPU/CPU capabilities
+                max_samples=500000  # Adjust this based on your GPU/CPU capabilities
             )
 
     # Sample training data for DNN

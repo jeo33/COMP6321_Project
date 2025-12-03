@@ -11,3 +11,6 @@ results/
 # Slurm output files
 *.out
 *.err
+
+# Local BERT model
+bert_model/
