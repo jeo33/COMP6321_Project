@@ -26,7 +26,7 @@ def main():
     else:
         print("⚠ WARNING: No GPU detected, will use CPU")
 
-    data_loader = RCV1DataLoader(data_dir='data')
+    data_loader = RCV1DataLoader(data_dir='.data/balanced_drop')
     evaluator = MultiLabelEvaluator(output_dir='results/plots')
 
     print("\n" + "="*70)
@@ -70,7 +70,7 @@ def main():
     print("Sampling a subset for efficient training...")
 
     # Use more samples with GPU
-    max_train_samples = 200000 if torch.cuda.is_available() else 50000
+    max_train_samples = 200000 if torch.cuda.is_available() else 200000
     if X_train.shape[0] > max_train_samples:
         indices = np.random.choice(X_train.shape[0], max_train_samples, replace=False)
         X_train_dnn = X_train[indices]
@@ -85,12 +85,13 @@ def main():
     print("="*70)
 
     model = DNNClassifier(
-        hidden_layers=[512, 128],   # 2 hidden layers 512,128
+        # hidden_layers=[512, 128],   # 2 hidden layers 512,128
+        hidden_layers=[512,128],
         #hidden_layers=[32768,8192,2048,512, 256, 128],  # 6 hidden layers
         activation='leaky_relu',                # ReLU activation
         dropout=0.5,                      # 50% dropout
         learning_rate=0.001,              
-        batch_size=512,                   
+        batch_size=256,                   
         epochs=50,                        
         device='auto',                    
         random_state=42

@@ -74,13 +74,13 @@ def main():
 
         # Initialize model
         model = DNNClassifier(
-            hidden_layers=[512, 128],
-            activation='relu',
-            dropout=dropout,
-            learning_rate=0.001,
-            batch_size=512,
-            epochs=20,  # Reduced epochs for sweep speed, adjust if needed
-            device='auto',
+            hidden_layers=[1024,512,256, 128],
+            activation='leaky_relu',                # ReLU activation
+            dropout=dropout,                      # Variable dropout from sweep
+            learning_rate=0.0005,              
+            batch_size=256,                   
+            epochs=50,                        
+            device='auto',                    
             random_state=42
         )
 
