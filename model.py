@@ -118,7 +118,7 @@ class MultiLabelClassifier:
 class MultiLabelDNN(nn.Module):
 
     def __init__(self, input_dim, hidden_layers=[512, 256, 128], n_labels=103,
-                 activation='relu', dropout=0.3):
+                 activation='relu', dropout=0.5):
         """
         Args:
             input_dim: Number of input features
@@ -183,19 +183,32 @@ class MultiLabelDNN(nn.Module):
 
 class DNNClassifier:
 
-    def __init__(self, hidden_layers=[512, 256, 128], activation='relu',
-                 dropout=0.3, learning_rate=0.001, batch_size=256,
-                 epochs=50, device='auto', random_state=42):
+    def __init__(self, hidden_layers=[2048, 1024, 512], activation='relu',
+                 dropout=0.3, learning_rate=0.0005, batch_size=256,
+                 epochs=50, device='auto', random_state=42,
+                 lr_scheduler='plateau', lr_patience=2, lr_factor=0.5,
+                 lr_min=1e-6, lr_t_max=None, early_stopping=True, 
+                 early_stopping_patience=3):
         """
         Args:
             hidden_layers: List of neurons per hidden layer [512, 256, 128]
             activation: Activation function ('relu', 'tanh', 'sigmoid', 'leaky_relu')
             dropout: Dropout rate for regularization (0.0 to 1.0)
-            learning_rate: Learning rate for Adam optimizer
+            learning_rate: Initial learning rate for Adam optimizer
             batch_size: Batch size for training
             epochs: Number of training epochs
             device: 'cuda', 'cpu', or 'auto'
             random_state: Random seed
+            lr_scheduler: Learning rate scheduler type ('plateau', 'cosine', 'none')
+                - 'plateau': ReduceLROnPlateau (reduces LR when validation loss plateaus)
+                - 'cosine': CosineAnnealingLR (cosine annealing schedule)
+                - 'none': No learning rate scheduling
+            lr_patience: Patience for ReduceLROnPlateau (epochs to wait before reducing)
+            lr_factor: Factor by which to reduce learning rate (new_lr = lr * factor)
+            lr_min: Minimum learning rate
+            lr_t_max: T_max for CosineAnnealingLR (defaults to epochs if None)
+            early_stopping: Enable early stopping based on validation loss
+            early_stopping_patience: Number of epochs with no improvement before stopping
         """
         self.hidden_layers = hidden_layers
         self.activation = activation
@@ -204,6 +217,17 @@ class DNNClassifier:
         self.batch_size = batch_size
         self.epochs = epochs
         self.random_state = random_state
+        
+        # Learning rate scheduler parameters
+        self.lr_scheduler_type = lr_scheduler
+        self.lr_patience = lr_patience
+        self.lr_factor = lr_factor
+        self.lr_min = lr_min
+        self.lr_t_max = lr_t_max if lr_t_max is not None else epochs
+        
+        # Early stopping parameters
+        self.early_stopping = early_stopping
+        self.early_stopping_patience = early_stopping_patience
 
         if device == 'auto':
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -218,6 +242,7 @@ class DNNClassifier:
         self.model = None
         self.is_fitted = False
         self.history = None
+        self.scheduler = None
 
         print(f"✓ Using device: {self.device}")
         if self.device.type == 'cuda':
@@ -281,6 +306,30 @@ class DNNClassifier:
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
         optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
+        # Initialize learning rate scheduler
+        if self.lr_scheduler_type == 'plateau':
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, 
+                mode='min', 
+                factor=self.lr_factor, 
+                patience=self.lr_patience,
+                min_lr=self.lr_min,
+                verbose=True
+            )
+            print(f"✓ Using ReduceLROnPlateau scheduler (patience={self.lr_patience}, factor={self.lr_factor}, min_lr={self.lr_min})")
+            if X_val is None or y_val is None:
+                print("⚠ Warning: ReduceLROnPlateau requires validation data. Scheduler will use training loss.")
+        elif self.lr_scheduler_type == 'cosine':
+            self.scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=self.lr_t_max,
+                eta_min=self.lr_min
+            )
+            print(f"✓ Using CosineAnnealingLR scheduler (T_max={self.lr_t_max}, eta_min={self.lr_min})")
+        else:
+            self.scheduler = None
+            print("✓ No learning rate scheduler")
+
         val_loader = None
         if X_val is not None and y_val is not None:
             if issparse(X_val):
@@ -293,10 +342,17 @@ class DNNClassifier:
             val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
         print(f"\nTraining for {self.epochs} epochs...")
-        print(f"Batch size: {self.batch_size}, Learning rate: {self.learning_rate}")
+        print(f"Batch size: {self.batch_size}, Initial learning rate: {self.learning_rate}")
+        if self.early_stopping and val_loader is not None:
+            print(f"Early stopping enabled (patience={self.early_stopping_patience})")
         print("-"*70)
 
-        self.history = {'train_loss': [], 'val_loss': [], 'epoch': []}
+        self.history = {'train_loss': [], 'val_loss': [], 'epoch': [], 'learning_rate': []}
+        
+        # Early stopping variables
+        best_val_loss = float('inf')
+        epochs_no_improve = 0
+        best_model_state = None
 
         for epoch in range(self.epochs):
             self.model.train()
@@ -315,6 +371,10 @@ class DNNClassifier:
             avg_train_loss = train_loss / len(dataloader)
             self.history['train_loss'].append(avg_train_loss)
             self.history['epoch'].append(epoch + 1)
+            
+            # Record current learning rate
+            current_lr = optimizer.param_groups[0]['lr']
+            self.history['learning_rate'].append(current_lr)
 
             if val_loader is not None:
                 self.model.eval()
@@ -329,13 +389,55 @@ class DNNClassifier:
                 self.history['val_loss'].append(avg_val_loss)
 
                 print(f"Epoch [{epoch+1:3d}/{self.epochs}] - "
-                      f"Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+                      f"Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, "
+                      f"LR: {current_lr:.6f}")
+                
+                # Early stopping check
+                if self.early_stopping:
+                    if avg_val_loss < best_val_loss:
+                        best_val_loss = avg_val_loss
+                        epochs_no_improve = 0
+                        best_model_state = self.model.state_dict().copy()
+                        print(f"  → New best validation loss: {best_val_loss:.4f}")
+                    else:
+                        epochs_no_improve += 1
+                        if epochs_no_improve >= self.early_stopping_patience:
+                            print(f"\n⚠ Early stopping triggered after {epoch+1} epochs")
+                            print(f"  Best validation loss: {best_val_loss:.4f} at epoch {epoch+1-epochs_no_improve}")
+                            if best_model_state is not None:
+                                self.model.load_state_dict(best_model_state)
+                                print(f"  Restored best model weights")
+                            break
+                
+                # Step scheduler based on type
+                if self.scheduler is not None:
+                    if self.lr_scheduler_type == 'plateau':
+                        self.scheduler.step(avg_val_loss)
+                    elif self.lr_scheduler_type == 'cosine':
+                        self.scheduler.step()
             else:
-                print(f"Epoch [{epoch+1:3d}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
+                print(f"Epoch [{epoch+1:3d}/{self.epochs}] - "
+                      f"Train Loss: {avg_train_loss:.4f}, LR: {current_lr:.6f}")
+                
+                # Step scheduler for cosine (plateau needs validation loss)
+                if self.scheduler is not None and self.lr_scheduler_type == 'cosine':
+                    self.scheduler.step()
+                elif self.scheduler is not None and self.lr_scheduler_type == 'plateau':
+                    # Use training loss if no validation data
+                    self.scheduler.step(avg_train_loss)
 
         self.is_fitted = True
         print("-"*70)
         print("✓ Training completed!")
+        
+        # Print learning rate schedule summary
+        if self.scheduler is not None:
+            print(f"\nLearning Rate Schedule:")
+            print(f"  Initial LR: {self.history['learning_rate'][0]:.6f}")
+            print(f"  Final LR:   {self.history['learning_rate'][-1]:.6f}")
+            print(f"  Min LR:     {min(self.history['learning_rate']):.6f}")
+            print(f"  Max LR:     {max(self.history['learning_rate']):.6f}")
+        
         return self.history
 
     def predict(self, X, threshold=0.5):
@@ -405,7 +507,14 @@ class DNNClassifier:
             'n_labels': self.model.n_labels,
             'learning_rate': self.learning_rate,
             'batch_size': self.batch_size,
-            'history': self.history
+            'history': self.history,
+            'lr_scheduler_type': self.lr_scheduler_type,
+            'lr_patience': self.lr_patience,
+            'lr_factor': self.lr_factor,
+            'lr_min': self.lr_min,
+            'lr_t_max': self.lr_t_max,
+            'early_stopping': self.early_stopping,
+            'early_stopping_patience': self.early_stopping_patience
         }, filepath)
         print(f"✓ DNN model saved to {filepath}")
 
@@ -425,7 +534,14 @@ class DNNClassifier:
             dropout=checkpoint['dropout'],
             learning_rate=checkpoint['learning_rate'],
             batch_size=checkpoint['batch_size'],
-            device=device
+            device=device,
+            lr_scheduler=checkpoint.get('lr_scheduler_type', 'none'),
+            lr_patience=checkpoint.get('lr_patience', 3),
+            lr_factor=checkpoint.get('lr_factor', 0.5),
+            lr_min=checkpoint.get('lr_min', 1e-6),
+            lr_t_max=checkpoint.get('lr_t_max', 50),
+            early_stopping=checkpoint.get('early_stopping', False),
+            early_stopping_patience=checkpoint.get('early_stopping_patience', 5)
         )
 
         classifier.model = MultiLabelDNN(

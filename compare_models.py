@@ -10,6 +10,10 @@ import os
 import time
 import json
 
+# 配置：必须与 main.py 保持一致
+USE_RCV1_BALANCED = True  # 使用平衡后的 RCV1 数据
+BALANCE_STRATEGY = 'drop'  # 'drop' 或 'oversample'
+
 
 class ModelComparator:
     
@@ -33,7 +37,19 @@ class ModelComparator:
         print("LOADING DATA")
         print("="*70)
         
-        data_loader = RCV1DataLoader(data_dir='data')
+        # 使用与 main.py 相同的数据配置
+        if USE_RCV1_BALANCED:
+            if BALANCE_STRATEGY == 'drop':
+                data_dir = 'data/balanced_drop'
+                print("🔹 Using Balanced RCV1 (Drop Rare Classes Strategy)")
+            else:
+                data_dir = 'data/balanced_oversample'
+                print("🔹 Using Balanced RCV1 (Oversampling Strategy)")
+        else:
+            data_dir = 'data'
+            print("🔹 Using Original Data")
+        
+        data_loader = RCV1DataLoader(data_dir=data_dir)
         X_train, y_train = data_loader.load_data('train')
         X_val, y_val = data_loader.load_data('val')
         X_test, y_test = data_loader.load_data('test')
@@ -77,6 +93,17 @@ class ModelComparator:
         print("EVALUATING MODELS (Precision, Recall, F1)")
         print("="*70)
         
+        # Load optimal threshold for DNN if available
+        dnn_threshold = 0.5  # default
+        try:
+            import json
+            with open('models/best_threshold.json', 'r') as f:
+                threshold_data = json.load(f)
+                dnn_threshold = threshold_data['threshold']
+                print(f"\n✓ Using optimal DNN threshold: {dnn_threshold:.2f} (Val F1: {threshold_data['val_f1']:.4f})")
+        except:
+            print(f"\n⚠ No optimal threshold found, using default: {dnn_threshold}")
+        
         self.results = []
         
         for name, model_dict in self.models.items():
@@ -87,7 +114,11 @@ class ModelComparator:
             
             try:
                 start_time = time.time()
-                result = model.predict(self.X_test)
+                # Use optimal threshold for DNN
+                if "DNN" in name and hasattr(model, 'predict'):
+                    result = model.predict(self.X_test, threshold=dnn_threshold)
+                else:
+                    result = model.predict(self.X_test)
                 if isinstance(result, tuple):
                     y_pred, pred_time = result
                 else:

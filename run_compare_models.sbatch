@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus-per-node=1
-#SBATCH --partition=compute
+#SBATCH --partition=debug
 
 # Set resource limits to avoid OpenBLAS threading issues
 ulimit -u 16384  # Increase max user processes

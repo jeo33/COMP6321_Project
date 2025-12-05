@@ -66,7 +66,7 @@ def balance_by_dropping_rare_classes(X, y, metadata, min_count=MIN_COUNT_DROP):
     new_metadata["target_names"] = [target_names[i] for i in keep_classes]
     new_metadata["balance_strategy"] = f"drop_classes_min_count_{min_count}"
 
-    return X_bal, y_bal, new_metadata
+    return X_bal, y_bal, new_metadata, keep_classes
 
 OVERSAMPLE_TARGET_PCT = 75
 
@@ -164,18 +164,38 @@ def main():
     metadata = base_loader.load_metadata()
 
 
-    X_train_drop, y_train_drop, meta_drop = balance_by_dropping_rare_classes(
+    X_train_drop, y_train_drop, meta_drop, keep_classes_drop = balance_by_dropping_rare_classes(
         X_train, y_train, metadata, min_count=MIN_COUNT_DROP
     )
+    
+    # 对验证集和测试集应用相同的类别过滤
+    y_val_drop = y_val[:, keep_classes_drop]
+    y_test_drop = y_test[:, keep_classes_drop]
+    
+    # 移除没有任何保留类别标签的样本
+    if issparse(y_val_drop):
+        val_has_label = np.asarray(y_val_drop.sum(axis=1) > 0).ravel()
+        test_has_label = np.asarray(y_test_drop.sum(axis=1) > 0).ravel()
+    else:
+        val_has_label = (y_val_drop.sum(axis=1) > 0)
+        test_has_label = (y_test_drop.sum(axis=1) > 0)
+    
+    X_val_drop = X_val[val_has_label]
+    y_val_drop = y_val_drop[val_has_label]
+    X_test_drop = X_test[test_has_label]
+    y_test_drop = y_test_drop[test_has_label]
+    
+    print(f"[Drop] Val samples: {X_val_drop.shape[0]} / {X_val.shape[0]}")
+    print(f"[Drop] Test samples: {X_test_drop.shape[0]} / {X_test.shape[0]}")
 
     save_balanced_dataset(
         data_dir_out=os.path.join("data", "balanced_drop"),
         X_train=X_train_drop,
         y_train=y_train_drop,
-        X_val=X_val,
-        y_val=y_val,
-        X_test=X_test,
-        y_test=y_test,
+        X_val=X_val_drop,
+        y_val=y_val_drop,
+        X_test=X_test_drop,
+        y_test=y_test_drop,
         metadata=meta_drop,
     )
 

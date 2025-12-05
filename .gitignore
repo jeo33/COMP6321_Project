@@ -4,6 +4,13 @@ results/
 # Ignore everything in comparison_results
 *.pkl
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
 # But don't ignore the plots directory
 !comparison_results/plots/
 !comparison_results/plots/**
