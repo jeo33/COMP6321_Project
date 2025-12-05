@@ -36,25 +36,30 @@ def main():
     try:
         X_train, y_train = data_loader.load_data('train')
         
-        # Check if data is likely BERT (768 features)
-        if X_train.shape[1] == 768:
-            print("✓ Loaded existing BERT embeddings")
+        # Check if data is RCV1 (103 categories)
+        if y_train.shape[1] == 103:
+            # Check if it's the full dataset (approx > 100k samples)
+            if X_train.shape[0] < 100000:
+                print(f"Existing data is a sampled subset ({X_train.shape[0]} samples). Switching to full dataset...")
+                raise FileNotFoundError("Sampled data found, forcing full download")
+
+            print("✓ Loaded existing RCV1 data")
             X_val, y_val = data_loader.load_data('val')
             X_test, y_test = data_loader.load_data('test')
             metadata = data_loader.load_metadata()
             target_names = metadata['target_names']
         else:
-            print(f"Existing data has {X_train.shape[1]} features (expected 768 for BERT). Regenerating...")
+            print(f"Existing data has {y_train.shape[1]} categories (expected 103 for RCV1). Regenerating...")
             raise FileNotFoundError("Data mismatch")
             
     except FileNotFoundError:
-        print("Generating BERT embeddings from raw text...")
-        # Using 20 Newsgroups dataset with BERT embeddings
+        print("Downloading and processing RCV1 dataset...")
+        # Using RCV1 dataset (Multi-label, TF-IDF features)
         X_train, y_train, X_val, y_val, X_test, y_test, target_names = \
-            data_loader.download_raw_and_embed(
+            data_loader.download_and_split(
                 test_size=0.2,
                 val_size=0.1,
-                max_samples=500000  # Adjust this based on your GPU/CPU capabilities
+                sample_size=None  # Use full dataset
             )
 
     # Sample training data for DNN
@@ -80,13 +85,13 @@ def main():
     print("="*70)
 
     model = DNNClassifier(
-        hidden_layers=[512, 256, 128],   # 3 hidden layers 8192,2048,512
+        hidden_layers=[512, 128],   # 2 hidden layers 512,128
         #hidden_layers=[32768,8192,2048,512, 256, 128],  # 6 hidden layers
-        activation='relu',                # ReLU activation
-        dropout=0.5,                      # 30% dropout
+        activation='leaky_relu',                # ReLU activation
+        dropout=0.5,                      # 50% dropout
         learning_rate=0.001,              
         batch_size=512,                   
-        epochs=20,                        
+        epochs=50,                        
         device='auto',                    
         random_state=42
     )
@@ -98,8 +103,8 @@ def main():
     print("STEP 3-5: COMPREHENSIVE EVALUATION")
     print("="*70)
 
-    # Use a lower threshold to improve recall
-    pred_threshold = 0.3
+    # Use a higher threshold to reduce false positives
+    pred_threshold = 0.5
     print(f"Using prediction threshold: {pred_threshold}")
 
     print("\nEvaluating on training set...")

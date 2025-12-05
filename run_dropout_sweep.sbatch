@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=compare_models
-#SBATCH --output=compare_models_%j.out
-#SBATCH --error=compare_models_%j.err
+#SBATCH --job-name=dropout_sweep
+#SBATCH --output=dropout_sweep_%j.out
+#SBATCH --error=dropout_sweep_%j.err
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -56,49 +56,13 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 unset PYTHONPATH
 export PYTHONNOUSERSITE=1
 
-echo "Starting model comparison at $(date)"
+echo "Starting dropout sweep at $(date)"
 echo "Running on node: $HOSTNAME"
 echo "Job ID: $SLURM_JOB_ID"
-echo "Number of CPUs: $SLURM_CPUS_PER_TASK"
-echo "Memory allocated: ${SLURM_MEM_PER_NODE}MB"
-echo ""
-
-# Check resource limits
-echo "Current resource limits:"
-ulimit -a
-echo ""
-
-# Check Python and NumPy installation
-echo "Active conda environment:"
-conda env list | grep '*'
-echo ""
-
-echo "Python version and location:"
-which python
-python --version
-echo ""
-
-echo "Checking NumPy installation:"
-python -c "import sys; print('Python executable:', sys.executable)"
-python -c "import numpy; print('NumPy version:', numpy.__version__); print('NumPy location:', numpy.__file__)" || echo "NumPy not found!"
-echo ""
-
-echo "Checking other required packages:"
-python -c "import pandas; print('Pandas version:', pandas.__version__)" || echo "Pandas not found!"
-python -c "import sklearn; print('Scikit-learn version:', sklearn.__version__)" || echo "Scikit-learn not found!"
 echo ""
 
 # Run the Python script
-echo "Running main.py to train DNN..."
-python main.py
-if [ $? -ne 0 ]; then
-    echo "main.py failed! Exiting."
-    exit 1
-fi
+echo "Running dropout_sweep.py..."
+python dropout_sweep.py
 
-echo "Running compare_models.py..."
-python compare_models.py
-
-echo ""
-echo "Model comparison completed at $(date)"
-echo "Exit code: $?"
+echo "Dropout sweep completed at $(date)"

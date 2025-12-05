@@ -275,11 +275,13 @@ class DNNClassifier:
         n_positives = np.sum(y, axis=0)
         n_negatives = n_samples - n_positives
         # Clamp weights to avoid extreme values for very rare classes
-        pos_weights = torch.FloatTensor(n_negatives / (n_positives + 1e-6)).to(self.device)
+        # Use sqrt to dampen the weights and reduce false positives
+        pos_weights = torch.FloatTensor(np.sqrt(n_negatives / (n_positives + 1e-6))).to(self.device)
         
         print(f"Using weighted loss to handle class imbalance (Avg weight: {pos_weights.mean().item():.2f})")
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
-        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        # Add weight decay for regularization
+        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=1e-4)
 
         val_loader = None
         if X_val is not None and y_val is not None:
@@ -297,6 +299,11 @@ class DNNClassifier:
         print("-"*70)
 
         self.history = {'train_loss': [], 'val_loss': [], 'epoch': []}
+
+        best_val_loss = float('inf')
+        patience = 5
+        patience_counter = 0
+        best_model_state = None
 
         for epoch in range(self.epochs):
             self.model.train()
@@ -330,8 +337,26 @@ class DNNClassifier:
 
                 print(f"Epoch [{epoch+1:3d}/{self.epochs}] - "
                       f"Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+                
+                # Early Stopping
+                if avg_val_loss < best_val_loss:
+                    best_val_loss = avg_val_loss
+                    patience_counter = 0
+                    best_model_state = self.model.state_dict()
+                else:
+                    patience_counter += 1
+                    if patience_counter >= patience:
+                        print(f"Early stopping triggered at epoch {epoch+1}")
+                        if best_model_state is not None:
+                            self.model.load_state_dict(best_model_state)
+                        break
             else:
                 print(f"Epoch [{epoch+1:3d}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
+        
+        # Load best model if validation was used
+        if best_model_state is not None:
+            self.model.load_state_dict(best_model_state)
+            print(f"Restored best model with Val Loss: {best_val_loss:.4f}")
 
         self.is_fitted = True
         print("-"*70)

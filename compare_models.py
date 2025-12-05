@@ -34,10 +34,48 @@ class ModelComparator:
         print("="*70)
         
         data_loader = RCV1DataLoader(data_dir='data')
-        X_train, y_train = data_loader.load_data('train')
-        X_val, y_val = data_loader.load_data('val')
-        X_test, y_test = data_loader.load_data('test')
-        metadata = data_loader.load_metadata()
+        
+        try:
+            X_train, y_train = data_loader.load_data('train')
+            
+            # Check if data is RCV1 (103 categories)
+            if y_train.shape[1] != 103:
+                print(f"⚠ Data has {y_train.shape[1]} categories (expected 103 for RCV1).")
+                print("Regenerating data using RCV1 dataset...")
+                X_train, y_train, X_val, y_val, X_test, y_test, target_names = \
+                    data_loader.download_and_split(
+                        test_size=0.2,
+                        val_size=0.1,
+                        sample_size=None  # Use full dataset
+                    )
+                self.target_names = target_names
+            else:
+                # Check if it's the full dataset (approx > 100k samples)
+                if X_train.shape[0] < 100000:
+                    print(f"Existing data is a sampled subset ({X_train.shape[0]} samples). Switching to full dataset...")
+                    X_train, y_train, X_val, y_val, X_test, y_test, target_names = \
+                        data_loader.download_and_split(
+                            test_size=0.2,
+                            val_size=0.1,
+                            sample_size=None  # Use full dataset
+                        )
+                    self.target_names = target_names
+                else:
+                    print("✓ Verified RCV1 data (103 categories)")
+                    X_val, y_val = data_loader.load_data('val')
+                    X_test, y_test = data_loader.load_data('test')
+                    metadata = data_loader.load_metadata()
+                    self.target_names = metadata['target_names']
+
+        except FileNotFoundError:
+            print("⚠ Data not found. Downloading RCV1 dataset...")
+            X_train, y_train, X_val, y_val, X_test, y_test, target_names = \
+                data_loader.download_and_split(
+                    test_size=0.2,
+                    val_size=0.1,
+                    sample_size=None  # Use full dataset
+                )
+            self.target_names = target_names
         
         if max_train_samples and X_train.shape[0] > max_train_samples:
             print(f"Sampling {max_train_samples:,} training samples...")
@@ -47,7 +85,6 @@ class ModelComparator:
         self.X_train, self.y_train = X_train, y_train
         self.X_val, self.y_val = X_val, y_val
         self.X_test, self.y_test = X_test, y_test
-        self.target_names = metadata['target_names']
         
         print(f"✓ Data loaded: train={X_train.shape[0]:,}, val={X_val.shape[0]:,}, test={X_test.shape[0]:,}")
     
@@ -87,12 +124,17 @@ class ModelComparator:
             
             try:
                 start_time = time.time()
-                result = model.predict(self.X_test)
+                # Use higher threshold for DNN to reduce false positives
+                if name == 'DNN (Our Model)':
+                    result = model.predict(self.X_test, threshold=0.5)
+                else:
+                    result = model.predict(self.X_test)
+                
                 if isinstance(result, tuple):
                     y_pred, pred_time = result
                 else:
                     y_pred = result
-                    pred_time = 0  # default prediction time
+                    pred_time = time.time() - start_time
                 y_test = self.y_test.toarray() if hasattr(self.y_test, 'toarray') else np.asarray(self.y_test)
                 y_pred = np.asarray(y_pred)
                 

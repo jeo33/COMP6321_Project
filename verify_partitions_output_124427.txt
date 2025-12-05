@@ -1,0 +1,42 @@
+Starting verification...
+Verification finished.
+
+scontrol show job 124427
+JobId=124427 JobName=verify_partitions
+   UserId=gjp1993(3152194) GroupId=gjp1993(3152194) MCS_label=N/A
+   Priority=592634 Nice=0 Account=def-gzhang-ab QOS=normal
+   JobState=COMPLETING Reason=None Dependency=(null)
+   Requeue=0 Restarts=0 BatchFlag=1 Reboot=0 ExitCode=0:0
+   RunTime=00:00:06 TimeLimit=01:00:00 TimeMin=N/A
+   SubmitTime=2025-12-03T17:26:33 EligibleTime=2025-12-03T17:26:33
+   AccrueTime=2025-12-03T17:26:33
+   StartTime=2025-12-03T17:26:34 EndTime=2025-12-03T17:26:40 Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2025-12-03T17:26:34 Scheduler=Main
+   Partition=compute AllocNode:Sid=trig-login01:3371243
+   ReqNodeList=(null) ExcNodeList=(null)
+   NodeList=trig0052
+   BatchHost=trig0052
+   NumNodes=1 NumCPUs=16 NumTasks=1 CPUs/Task=16 ReqB:S:C:T=0:0:*:*
+   ReqTRES=cpu=16,mem=192500M,node=1,billing=1,gres/gpu=1
+   AllocTRES=cpu=16,mem=192500M,node=1,billing=1,gres/gpu=1
+   Socks/Node=* NtasksPerN:B:S:C=0:0:*:* CoreSpec=*
+   MinCPUsNode=16 MinMemoryNode=192500M MinTmpDiskNode=0
+   Features=(null) DelayBoot=00:00:00
+   OverSubscribe=OK Contiguous=0 Licenses=(null) Network=(null)
+   Command=../RTIVA_pivot/script/submit_tt.sh
+   WorkDir=/scratch/gjp1993/COMP6321_Project
+   Comment=/opt/slurm/bin/sbatch --export=NONE --get-user-env=L ../RTIVA_pivot/script/submit_tt.sh 
+   StdErr=/scratch/gjp1993/COMP6321_Project/verify_partitions_error_124427.txt
+   StdIn=/dev/null
+   StdOut=/scratch/gjp1993/COMP6321_Project/verify_partitions_output_124427.txt
+   TresPerNode=gres/gpu:1
+   TresPerTask=cpu=16
+   
+
+sacct -j 124427
+JobID           JobName    Account    Elapsed  MaxVMSize     MaxRSS  SystemCPU    UserCPU ExitCode 
+------------ ---------- ---------- ---------- ---------- ---------- ---------- ---------- -------- 
+124427       verify_pa+ def-gzhan+   00:00:06                         00:00:00   00:00:00      0:0 
+124427.batch      batch def-gzhan+   00:00:06                         00:00:00   00:00:00      0:0 
+124427.exte+     extern def-gzhan+   00:00:06                         00:00:00   00:00:00      0:0 
+

@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/scratch/gjp1993/RTIVA_pivot/script/xx.py", line 2, in <module>
+    import matplotlib.pyplot as plt
+  File "/home/gjp1993/miniconda3/envs/RTIVA/lib/python3.10/site-packages/matplotlib/__init__.py", line 161, in <module>
+    from . import _api, _version, cbook, _docstring, rcsetup
+  File "/home/gjp1993/miniconda3/envs/RTIVA/lib/python3.10/site-packages/matplotlib/rcsetup.py", line 28, in <module>
+    from matplotlib.colors import Colormap, is_color_like
+  File "/home/gjp1993/miniconda3/envs/RTIVA/lib/python3.10/site-packages/matplotlib/colors.py", line 52, in <module>
+    from PIL import Image
+  File "/home/gjp1993/miniconda3/envs/RTIVA/lib/python3.10/site-packages/PIL/Image.py", line 97, in <module>
+    from . import _imaging as core
+ImportError: libopenjp2.so.7: cannot open shared object file: No such file or directory
